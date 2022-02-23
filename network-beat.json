@@ -1,0 +1,95 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {
+    "url": {
+      "index": "network-status", 
+      "body": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-1m/m"
+            }
+          }
+        },
+        "aggs": {
+          "host": {
+            "terms": {
+              "field": "host.hostname.keyword",
+              "size": 1000
+            },
+            "aggs":{
+              "network": {
+                "terms": {
+                  "field": "network.name.keyword",
+                  "size": 1000
+                },
+                "aggs": {
+                  "latest": {
+                    "top_hits": {
+                      "size": 1,
+                      "sort": [{"@timestamp": "desc"}]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "format": {"property":"aggregations.host.buckets"}
+  },
+  "transform": [
+    {
+      "flatten":["network.buckets"],
+      "as":["buckies"]
+    },
+    {
+      "flatten":["buckies.latest.hits.hits"],
+      "as":["hittos"]
+    },
+    {
+      "calculate": "datum.hittos._source['network.enabled'] + 2*datum.hittos._source['network.status']",
+      "as": "status"
+    }
+  ],
+  "mark": "rect",
+  "encoding": {
+    "tooltip": [
+      {
+        "field": "key",
+        "type": "nominal",
+        "title": "Host"
+      },
+      {
+        "field": "buckies.key",
+        "type": "nominal",
+        "title": "Network"
+      }
+    ],
+    "y": {
+      "field": "key",
+      "type": "nominal",
+      "axis": {
+        "title": null
+      }
+    },
+    "x": {
+      "field": "buckies.key",
+      "type": "nominal",
+      "axis": {
+        "title": null
+      }
+    },
+    "color": {
+      "condition": [
+        {"test": "datum['status'] == '00'", "value": "#999"},
+        {"test": "datum['status'] == '10'", "value": "#F00"},
+        {"test": "datum['status'] == '12'", "value": "#0F0"}
+      ],
+      "value": "#FF0"
+    }
+  },
+  "config": {"axis": {"grid": true, "tickBand": "extent"}}
+}
